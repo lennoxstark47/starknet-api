@@ -7,6 +7,9 @@ const passport = require('passport');
 const User = require('../../models/User');
 const keys = require('../../config/keys');
 
+//Load input validation
+const validateRegisterInput = require('../../validation/register');
+
 //@route GET api/users/test
 //@desc testing
 //@access public
@@ -20,21 +23,25 @@ router.get('/test', (req, res) =>
 //@access public
 
 router.post('/register', (req, res) => {
-	User.findOne({ email: req.body.email }).then(
-		(user) => {
+	const { errors, isValid } =
+		validateRegisterInput(req.body);
+
+	//Check Validation
+	if (!isValid) {
+		res.status(400).json(errors);
+	}
+
+	User.findOne({ email: req.body.email })
+		.then((user) => {
 			if (user) {
-				res.status(400).json({
-					email: 'Email already exists',
-				});
+				errors.email = 'Email already exists';
+				return res.status(400).json(errors);
 			} else {
-				const avatar = gravatar.url(
-					req.body.email,
-					{
-						s: '200', // size
-						r: 'x', //rating
-						d: 'mm', //default
-					}
-				);
+				const avatar = gravatar.url(req.body.email, {
+					s: '200', // size
+					r: 'x', //rating
+					d: 'mm', //default
+				});
 				const newUser = new User({
 					name: req.body.name,
 					email: req.body.email,
@@ -56,8 +63,8 @@ router.post('/register', (req, res) => {
 					);
 				});
 			}
-		}
-	);
+		})
+		.catch((err) => console.log(err));
 });
 
 //@route POST api/users/login
@@ -109,7 +116,18 @@ router.post('/login', (req, res) => {
 		}
 	);
 });
-//@route POST api/users/current
+//@route GET api/users/current
 //@desc return current user
 //@access private
+router.get(
+	'/current',
+	passport.authenticate('jwt', { session: false }),
+	(req, res) => {
+		res.json({
+			id: req.user.id,
+			name: req.user.name,
+			email: req.user.email,
+		});
+	}
+);
 module.exports = router;
